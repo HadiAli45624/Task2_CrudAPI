@@ -89,7 +89,7 @@ async def create_task(request: Request):
     new_id = cursor.lastrowid
     conn.close()
 
-    task = {"id": new_id, "title": data["title"], "done": data['done']}
+    task = {"id": new_id, "title": data["title"], "done": False}
 
     return JSONResponse(task, status_code=200)
 
@@ -102,21 +102,41 @@ async def update_task(id: int, request: Request):
     if not data or "title" not in data or not data["title"]:
         return JSONResponse({'error': 'Empty/Invalid Body'}, status_code=400)
 
-    for task in tasks:
-        if task["id"] == id:
-            t
 
-    return JSONResponse({'error': 'Unknown ID'}, status_code=404)
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("UPDATE tasks SET title = ? WHERE id = ?", (data["title"], id))
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        conn.close()
+        return JSONResponse({'error': 'Unknown ID'}, status_code=404)
+
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (id, ))
+    task = cursor.fetchone()
+
+    task = dict(task)
+
+    conn.close()
+
+    return JSONResponse(task, status_code=200)
 
 
 @app.delete('/tasks/{id}')
 def delete_task(id: int):
-    for task in tasks:
-        if task['id'] == id:
-            tasks.remove(task)
-            return Response(status_code=204)
+    conn = get_db()
+    cursor = conn.cursor()
 
-    return JSONResponse({'error': 'Id not found'}, status_code=404)
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (id,))
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        conn.close()
+        return JSONResponse({'error': 'Unknown ID'}, status_code=404)
+
+    conn.close()
+    return Response(status_code=204)
 
 
 if __name__ == '__main__':
