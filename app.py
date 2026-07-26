@@ -80,14 +80,19 @@ async def create_task(request: Request):
     if not data or "title" not in data or not data['title']:
         return JSONResponse({"error": "Task Title does not exist"}, status_code=400)
 
-    new_task = {
-        "id": tasks[-1]["id"] + 1 if tasks else 1,
-        "title": data["title"],
-        "done": False
-    }
+    conn = get_db()
+    cursor = conn.cursor()
 
-    tasks.append(new_task)
-    return JSONResponse(new_task, status_code=201)
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (data["title"], False))
+    conn.commit()
+
+    new_id = cursor.lastrowid
+    conn.close()
+
+    task = {"id": new_id, "title": data["title"], "done": data['done']}
+
+    return JSONResponse(task, status_code=200)
+
 
 
 @app.put("/tasks/{id}")
@@ -99,8 +104,7 @@ async def update_task(id: int, request: Request):
 
     for task in tasks:
         if task["id"] == id:
-            task["title"] = data["title"]
-            return JSONResponse(task, status_code=200)
+            t
 
     return JSONResponse({'error': 'Unknown ID'}, status_code=404)
 
