@@ -1,0 +1,109 @@
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
+import sqlite3
+
+app = FastAPI()
+
+def init_db():
+    conn = sqlite3.connect("tasks.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            title TEXT,
+            done BOOLEAN
+        )
+            """)
+
+    cursor.execute("SELECT COUNT(*) FROM tasks")
+    result = cursor.fetchone()
+    count = result[0]
+
+    if count == 0:
+        cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)" , ("Learn Backend", False))
+        cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)" , ("Complete Data Structures Course", False))
+        cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)" , ("Get Healthier", True))
+
+    conn.commit()
+    conn.close()
+
+
+
+
+tasks = [
+    {"id": 1, "title": "Learn Backend", "done": False},
+    {"id": 2, "title": "Complete Data Structure Course", "done": False},
+    {"id": 3, "title": "Get Healthier", "done": True}
+]
+
+
+@app.get("/")
+def home():
+    return JSONResponse({"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}, status_code=200)
+
+
+@app.get("/health")
+def check():
+    return JSONResponse({"status": "ok"}, status_code=200)
+
+
+@app.get("/tasks")
+def get_tasks():
+    return JSONResponse(tasks, status_code=200)
+
+
+@app.get("/tasks/{id}")
+def get_tasknum(id: int):
+    for task in tasks:
+        if task["id"] == id:
+            return JSONResponse(task, status_code=200)
+    return JSONResponse({'error': f"Task {id} Not found"}, status_code=404)
+
+
+@app.post("/tasks")
+async def create_task(request: Request):
+    data = await request.json()
+
+    if not data or "title" not in data or not data['title']:
+        return JSONResponse({"error": "Task Title does not exist"}, status_code=400)
+
+    new_task = {
+        "id": tasks[-1]["id"] + 1 if tasks else 1,
+        "title": data["title"],
+        "done": False
+    }
+
+    tasks.append(new_task)
+    return JSONResponse(new_task, status_code=201)
+
+
+@app.put("/tasks/{id}")
+async def update_task(id: int, request: Request):
+    data = await request.json()
+
+    if not data or "title" not in data or not data["title"]:
+        return JSONResponse({'error': 'Empty/Invalid Body'}, status_code=400)
+
+    for task in tasks:
+        if task["id"] == id:
+            task["title"] = data["title"]
+            return JSONResponse(task, status_code=200)
+
+    return JSONResponse({'error': 'Unknown ID'}, status_code=404)
+
+
+@app.delete('/tasks/{id}')
+def delete_task(id: int):
+    for task in tasks:
+        if task['id'] == id:
+            tasks.remove(task)
+            return Response(status_code=204)
+
+    return JSONResponse({'error': 'Id not found'}, status_code=404)
+
+
+if __name__ == '__main__':
+    init_db()
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
