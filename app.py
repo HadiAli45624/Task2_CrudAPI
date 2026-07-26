@@ -29,13 +29,10 @@ def init_db():
     conn.close()
 
 
-
-
-tasks = [
-    {"id": 1, "title": "Learn Backend", "done": False},
-    {"id": 2, "title": "Complete Data Structure Course", "done": False},
-    {"id": 3, "title": "Get Healthier", "done": True}
-]
+def get_db():
+    conn = sqlite3.connect("tasks.db")
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @app.get("/")
@@ -50,15 +47,30 @@ def check():
 
 @app.get("/tasks")
 def get_tasks():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM tasks")
+    tasks = [dict(row) for row in cursor.fetchall()]
+    conn.close()
     return JSONResponse(tasks, status_code=200)
 
 
 @app.get("/tasks/{id}")
 def get_tasknum(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            return JSONResponse(task, status_code=200)
-    return JSONResponse({'error': f"Task {id} Not found"}, status_code=404)
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        return JSONResponse({'error': f"Task {id} not found"}, status_code=404)
+
+    task = dict(row)
+    return JSONResponse(task, status_code=200)
+
 
 
 @app.post("/tasks")
